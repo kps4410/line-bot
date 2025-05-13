@@ -38,7 +38,7 @@ def callback():
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text(event):
     user_message = event.message.text
-    print(f"🔵 受信メッセージ: {user_message}")
+    print(f"🔵 受信メッセージ: {user_message}")  # ログ出力
 
     try:
         response = openai.ChatCompletion.create(
@@ -48,14 +48,12 @@ def handle_text(event):
                 {"role": "user", "content": user_message}
             ]
         )
-        print(f"🟡 OpenAIレスポンス全文: {response}")
         reply_text = response['choices'][0]['message']['content']
-        print(f"🟢 OpenAI応答: {reply_text}")
+        print(f"🟢 OpenAI応答: {reply_text}")  # ログ出力
     except Exception as e:
-        print(f"🔴 OpenAIエラー: {e}")
+        print(f"🔴 OpenAIエラー: {e}")  # ログ出力
         reply_text = "申し訳ありません、現在AIの応答に問題が発生しています。"
 
-    # LINEに返信
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message(
