@@ -1,8 +1,44 @@
+from flask import Flask, request, abort
+import openai
+import os
+
+from linebot.v3.webhook import WebhookHandler
+from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.v3.messaging.models import ReplyMessageRequest, TextMessage
+from linebot.v3.exceptions import InvalidSignatureError
+
+app = Flask(__name__)
+
+# 環境変数からトークンを読み込み
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+LINE_CHANNEL_SECRET = os.environ.get('LINE_CHANNEL_SECRET')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+
+# ChatGPTのAPIキー設定
+openai.api_key = OPENAI_API_KEY
+
+# LINEの設定
+configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+@app.route("/callback", methods=['POST'])
+def callback():
+    signature = request.headers.get('X-Line-Signature', '')
+    body = request.get_data(as_text=True)
+
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+
+    return 'OK'
+
 # ChatGPTでテキスト返信
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text(event):
     user_message = event.message.text
-    print(f"🔵 受信メッセージ: {user_message}")  # 受信ログ出力
+    print(f"🔵 受信メッセージ: {user_message}")
 
     try:
         response = openai.ChatCompletion.create(
@@ -12,15 +48,14 @@ def handle_text(event):
                 {"role": "user", "content": user_message}
             ]
         )
-        print(f"🟡 OpenAIレスポンス全文: {response}")  # ←ここを追加！
-
+        print(f"🟡 OpenAIレスポンス全文: {response}")
         reply_text = response['choices'][0]['message']['content']
-        print(f"🟢 OpenAI応答: {reply_text}")  # 応答内容表示
+        print(f"🟢 OpenAI応答: {reply_text}")
     except Exception as e:
-        print(f"🔴 OpenAIエラー: {e}")  # エラー内容表示
+        print(f"🔴 OpenAIエラー: {e}")
         reply_text = "申し訳ありません、現在AIの応答に問題が発生しています。"
 
-    # LINEへ返答
+    # LINEに返信
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message(
@@ -29,3 +64,6 @@ def handle_text(event):
                 messages=[TextMessage(text=reply_text)]
             )
         )
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
